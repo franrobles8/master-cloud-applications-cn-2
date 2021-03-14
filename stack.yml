@@ -63,15 +63,22 @@ Resources:
         !Ref CustomInstanceProfile
       SecurityGroups:
         - !Ref ec2SecurityGroup
-      UserData: # TO DO: Add arguments to execute the JAR with bucket name, etc
+      UserData:
         Fn::Base64: 
           Fn::Sub: 
             - |
               #!/bin/bash -ex
               apt-get update && apt-get install -y openjdk-8-jre-headless
               wget https://s3.amazonaws.com/practica-2.cloud.michel/app.jar
-              java -jar app.jar --cloud.aws.rds.springaws.password=${Pass}
-            - Pass: !Ref DBPassword
+              export RDS_USER=prac2user
+              export RDS_PASS=${DBPass}
+              export RDS_ENDPOINT=${!GetAtt rdsDBInstance.Endpoint.Address}
+              export RDS_DATABASE=prac2CloudformationDB
+              export BUCKET_NAME=${BucketName}
+              java -jar app.jar \
+                --spring.profiles.active=production
+            - DBPass: !Ref DBPassword
+            
       Tags:
         - Key: Name
           Value: EC2 instance for practice 2
@@ -115,6 +122,9 @@ Resources:
         - Effect: Allow
           Action: "s3:*"
           Resource: "*"
+        - Effect: Allow
+          Action: "rds:*"
+          Resource: "arn:aws:rds:*:*:*"
       Roles:
       - !Ref CustomRole
 

@@ -5,7 +5,7 @@ Parameters:
   AMIEC2Id:
     Description: AMI Id for EC2 Instance
     Type:  AWS::EC2::Image::Id
-    Default: ami-013f17f36f8b1fefb # Ubuntu 18.04 us-east-1
+    Default: ami-06fd78dc2f0b69910 # Ubuntu 18.04 eu-west-1
   DBPassword:
     Description: Password for RDS MySQL Database
     Type: String
@@ -18,6 +18,9 @@ Parameters:
     Description: URL that will be used to download the JAR file
     Type: String
     Default: https://s3.amazonaws.com/practica-2.cloud.michel/app.jar
+  KeyPairName:
+    Description: Key pair to use in EC2 instance
+    Type: AWS::EC2::KeyPair::KeyName
 
 Resources:
   rdsDBInstance:
@@ -58,6 +61,7 @@ Resources:
     Properties:
       ImageId: !Ref AMIEC2Id 
       InstanceType: t2.micro
+      KeyName: !Ref KeyPairName
       Monitoring: true
       IamInstanceProfile:
         !Ref CustomInstanceProfile
@@ -68,16 +72,19 @@ Resources:
           Fn::Sub: 
             - |
               #!/bin/bash -ex
-              apt-get update && apt-get install -y openjdk-8-jre-headless
+              apt-get update && apt-get install -y openjdk-11-jre-headless
               wget https://s3.amazonaws.com/practica-2.cloud.michel/app.jar
               export RDS_USER=prac2user
               export RDS_PASS=${DBPass}
-              export RDS_ENDPOINT=${!GetAtt rdsDBInstance.Endpoint.Address}
+              export RDS_ENDPOINT=${DBEndpoint}
               export RDS_DATABASE=prac2CloudformationDB
               export BUCKET_NAME=${BucketName}
+              export REGION=${AWSRegion}
               java -jar app.jar \
                 --spring.profiles.active=production
             - DBPass: !Ref DBPassword
+              DBEndpoint: !GetAtt rdsDBInstance.Endpoint.Address
+              AWSRegion: !Ref "AWS::Region"
             
       Tags:
         - Key: Name
@@ -87,7 +94,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: spring-8080-8443
-      GroupDescription: "Security Group with egress ports 80 & 443"
+      GroupDescription: "Security Group with egress ports 8080 & 8443"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: '8080'
@@ -96,6 +103,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: '8443'
           ToPort: '8443'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
           CidrIp: 0.0.0.0/0
 
   CustomRole:
@@ -140,7 +151,7 @@ Outputs:
     Value:
       !Join
         - ''
-        - - "http://"
+        - - "https://"
           - !GetAtt myEC2Instance.PublicDnsName
-          - ":8080/"
+          - ":8443/"
     Description: "Practice 2 endpoint"

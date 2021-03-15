@@ -23,6 +23,13 @@ Parameters:
     Type: AWS::EC2::KeyPair::KeyName
 
 Resources:
+  appS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+
   rdsDBInstance:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -37,7 +44,7 @@ Resources:
       MasterUsername: prac2user
       MasterUserPassword: !Ref DBPassword
       MultiAZ: false
-      PubliclyAccessible: true
+      PubliclyAccessible: false
       StorageEncrypted: false
       VPCSecurityGroups:
         - !GetAtt rdsSecurityGroup.GroupId
@@ -125,14 +132,24 @@ Resources:
 
   RolePolicies:
     Type: AWS::IAM::Policy
+    DependsOn: appS3Bucket
     Properties:
-      PolicyName: root
+      PolicyName: Prac2EC2RolePolicy
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
         - Effect: Allow
           Action: "s3:*"
-          Resource: "*"
+          Resource:
+          - 'Fn::Join':
+              - ''
+              - - 'arn:aws:s3:::'
+                - Ref: BucketName
+          - 'Fn::Join':
+              - ''
+              - - 'arn:aws:s3:::'
+                - Ref: BucketName
+                - /*
         - Effect: Allow
           Action: "rds:*"
           Resource: "arn:aws:rds:*:*:*"
@@ -153,5 +170,5 @@ Outputs:
         - ''
         - - "https://"
           - !GetAtt myEC2Instance.PublicDnsName
-          - ":8443/"
+          - ":8443"
     Description: "Practice 2 endpoint"
